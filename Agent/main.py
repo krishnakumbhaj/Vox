@@ -334,14 +334,14 @@ app = FastAPI(title="AI Database Analyst API", version="2.0.0")
 # Add CORS middleware for NextJS frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # NextJS default port
+    allow_origins=["https://vox-phi.vercel.app/"],  # NextJS default port
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Configuration
-NEXTJS_API_URL = "http://localhost:3000/api"
+NEXTJS_API_URL = "https://vox-phi.vercel.app/api"
 CHAT_SAVE_TIMEOUT = 10  # seconds
 
 # Global agent instance
