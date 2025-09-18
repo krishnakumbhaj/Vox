@@ -1,4 +1,4 @@
-# Complete FastAPI main.py - FIXED VERSION
+# Complete FastAPI main.py
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,22 +11,25 @@ from config import Config
 
 app = FastAPI(title="AI Database Analyst API", version="2.0.0")
 
-# FIXED: Improved CORS middleware configuration
+# Add CORS middleware for NextJS frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://vox-phi.vercel.app",  # Removed trailing slash
-        "http://localhost:3000",      # For local development
-        "http://localhost:3001",      # Alternative local port
-    ],
+        "https://vox-phi.vercel.app",  # Remove trailing slash!
+        "https://*.vercel.app",  # Allow Vercel preview deployments
+        "http://localhost:3000",  # For local development
+        "http://127.0.0.1:3000"   # Alternative localhost
+    ],  
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configuration
-NEXTJS_API_URL = "https://vox-phi.vercel.app/api"
-CHAT_SAVE_TIMEOUT = 30  # Increased timeout
+# Configuration - Using environment variables
+import os
+FASTAPI_URL = os.getenv("FASTAPI_URL", "https://vox-9xr7.onrender.com")  # Your Render URL (this app)
+NEXTJS_API_URL = os.getenv("NEXTJS_API_URL", "https://vox-phi.vercel.app/api")  # Your Vercel API URL
+CHAT_SAVE_TIMEOUT = 10  # seconds
 
 # Global agent instance
 agent = None
@@ -42,8 +45,8 @@ class DatabaseConnection(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
-    user_id: Optional[str] = None
-    chat_id: Optional[str] = None
+    user_id: Optional[str] = None  # For logging purposes
+    chat_id: Optional[str] = None  # For reference
 
 class QueryResponse(BaseModel):
     success: bool
@@ -52,7 +55,7 @@ class QueryResponse(BaseModel):
     data: Optional[List[Dict[str, Any]]] = None
     visualization_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    message_id: Optional[str] = None
+    message_id: Optional[str] = None  # Added for message tracking
 
 class ConnectionStatus(BaseModel):
     connected: bool
@@ -63,7 +66,7 @@ class ConnectionStatus(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     user_id: str
-    chat_id: Optional[str] = None
+    chat_id: Optional[str] = None  # If None, create new chat
 
 class ChatResponse(BaseModel):
     success: bool
@@ -73,108 +76,67 @@ class ChatResponse(BaseModel):
     error: Optional[str] = None
 
 def get_agent():
-    """FIXED: Improved dependency with better error handling"""
+    """Dependency to get or create agent instance"""
     global agent
     if agent is None:
         try:
             agent = DatabaseAnalystAgent()
         except Exception as e:
-            # Log the error but don't fail immediately
-            print(f"Warning: Failed to initialize agent: {str(e)}")
-            # Return a mock agent or handle gracefully
-            agent = None
+            raise HTTPException(status_code=500, detail=f"Failed to initialize agent: {str(e)}")
     return agent
 
 async def send_to_nextjs(endpoint: str, data: Dict[str, Any], method: str = "POST") -> Dict[str, Any]:
     """
-    FIXED: Improved NextJS API communication with better error handling
+    Send data to NextJS API
+    Returns response data or raises exception
     """
     try:
         url = f"{NEXTJS_API_URL}/{endpoint}"
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-        
         async with httpx.AsyncClient(timeout=CHAT_SAVE_TIMEOUT) as client:
             if method.upper() == "POST":
-                response = await client.post(url, json=data, headers=headers)
+                response = await client.post(url, json=data)
             elif method.upper() == "GET":
-                response = await client.get(url, params=data, headers=headers)
+                response = await client.get(url, params=data)
             elif method.upper() == "DELETE":
-                response = await client.delete(url, headers=headers)
+                response = await client.delete(url)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
-            response.raise_for_status()  # Raises exception for HTTP errors
-            
-            try:
+            if response.status_code == 200:
                 result = response.json()
-            except:
-                # If response is not JSON, return success message
-                result = {"success": True, "message": "Operation completed"}
-            
-            print(f"✅ NextJS API call successful: {endpoint}")
-            return result
+                print(f"✅ NextJS API call successful: {endpoint}")
+                return result
+            else:
+                print(f"❌ NextJS API error: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"NextJS API error: {response.text}")
                 
     except httpx.TimeoutException:
         print(f"⏰ Timeout calling NextJS API: {endpoint}")
         raise HTTPException(status_code=504, detail="NextJS API timeout")
-    except httpx.HTTPStatusError as e:
-        print(f"❌ HTTP error calling NextJS API: {e.response.status_code}")
-        raise HTTPException(status_code=e.response.status_code, detail=f"NextJS API error: {e.response.text}")
     except Exception as e:
         print(f"❌ Error calling NextJS API: {str(e)}")
         raise HTTPException(status_code=500, detail=f"NextJS API error: {str(e)}")
-
-# FIXED: Added explicit OPTIONS handler for CORS preflight
-@app.options("/{path:path}")
-async def options_handler(path: str):
-    """Handle CORS preflight requests"""
-    return {"message": "OK"}
 
 @app.get("/")
 async def root():
     """Health check endpoint"""
     return {"message": "AI Database Analyst API v2.0", "status": "active"}
 
-# FIXED: Added health check endpoint
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
-    try:
-        agent_status = "initialized" if agent is not None else "not_initialized"
-        return {
-            "status": "healthy",
-            "agent": agent_status,
-            "api_version": "2.0.0"
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+    """Health check endpoint for monitoring"""
+    return {"status": "healthy", "message": "FastAPI backend is running"}
 
 @app.get("/agent-info")
-async def get_agent_info():
-    """FIXED: Get agent info with better error handling"""
-    try:
-        current_agent = get_agent()
-        if current_agent is None:
-            return {"error": "Agent not initialized", "available": False}
-        return current_agent.get_agent_info()
-    except Exception as e:
-        return {"error": str(e), "available": False}
+async def get_agent_info(agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Get information about the agent capabilities"""
+    return agent.get_agent_info()
 
 @app.post("/connect", response_model=ConnectionStatus)
-async def connect_database(connection: DatabaseConnection):
-    """FIXED: Connect to database with improved error handling"""
+async def connect_database(connection: DatabaseConnection, agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Connect to a database"""
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            raise HTTPException(status_code=500, detail="Agent not initialized")
-            
-        connection_string = current_agent.create_connection_string(
+        connection_string = agent.create_connection_string(
             connection.db_type,
             connection.host,
             connection.port,
@@ -183,10 +145,10 @@ async def connect_database(connection: DatabaseConnection):
             connection.password
         )
         
-        success, message = current_agent.connect_database(connection_string)
+        success, message = agent.connect_database(connection_string)
         
         if success:
-            status = current_agent.get_connection_status()
+            status = agent.get_connection_status()
             return ConnectionStatus(
                 connected=status['connected'],
                 tables_count=status['tables_count'],
@@ -196,25 +158,14 @@ async def connect_database(connection: DatabaseConnection):
         else:
             raise HTTPException(status_code=400, detail=message)
             
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
 
 @app.get("/connection-status", response_model=ConnectionStatus)
-async def get_connection_status():
-    """FIXED: Get connection status with better error handling"""
+async def get_connection_status(agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Get current database connection status"""
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            return ConnectionStatus(
-                connected=False,
-                tables_count=0,
-                tables=[],
-                message="Agent not initialized"
-            )
-            
-        status = current_agent.get_connection_status()
+        status = agent.get_connection_status()
         return ConnectionStatus(
             connected=status['connected'],
             tables_count=status['tables_count'],
@@ -222,66 +173,45 @@ async def get_connection_status():
             message="Connected" if status['connected'] else "Not connected"
         )
     except Exception as e:
-        return ConnectionStatus(
-            connected=False,
-            tables_count=0,
-            tables=[],
-            message=f"Error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/tables")
-async def get_table_info():
-    """FIXED: Get table info with improved error handling"""
+async def get_table_info(agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Get information about database tables"""
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            raise HTTPException(status_code=500, detail="Agent not initialized")
-            
-        if not current_agent.get_connection_status()['connected']:
+        if not agent.get_connection_status()['connected']:
             raise HTTPException(status_code=400, detail="No database connection")
-        return current_agent.get_table_info()
-    except HTTPException:
-        raise
+        return agent.get_table_info()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/query", response_model=QueryResponse)
-async def execute_query(request: QueryRequest):
-    """FIXED: Execute query with improved error handling"""
+async def execute_query(request: QueryRequest, agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Execute natural language query - NextJS will handle saving"""
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            return QueryResponse(
-                success=False,
-                response="",
-                error="Agent not initialized"
-            )
-            
-        if not current_agent.get_connection_status()['connected']:
-            return QueryResponse(
-                success=False,
-                response="",
-                error="No database connection"
-            )
+        if not agent.get_connection_status()['connected']:
+            raise HTTPException(status_code=400, detail="No database connection")
 
+        # Log the request for debugging
         print(f"🔍 Processing query for user: {request.user_id}, chat: {request.chat_id}")
         print(f"📝 Query: {request.query}")
 
         # Execute the query
-        result = current_agent.execute_natural_language_query(request.query)
+        result = agent.execute_natural_language_query(request.query)
 
         # Convert DataFrame to list of dictionaries for JSON serialization
         data_list = None
-        if result['data'] is not None and not result['data'].empty:
+        if result['data'] is not None:
             data_list = result['data'].to_dict('records')
 
-        # Prepare visualization data
+        # Prepare visualization data (chart configuration for frontend)
         visualization_data = None
         if result['data'] is not None and not result['data'].empty:
             visualization_data = prepare_visualization_data(result['data'], request.query)
 
         print(f"✅ Query processed successfully: {result['success']}")
 
+        # Return response - NextJS will handle saving
         return QueryResponse(
             success=result['success'],
             response=result['response'],
@@ -301,21 +231,14 @@ async def execute_query(request: QueryRequest):
         )
 
 @app.post("/chat", response_model=ChatResponse)
-async def process_chat(request: ChatRequest):
+async def process_chat(request: ChatRequest, agent: DatabaseAnalystAgent = Depends(get_agent)):
     """
-    FIXED: Process chat with improved error handling
+    Process chat message and save to NextJS
+    This endpoint handles the complete flow: Query -> Process -> Save -> Respond
     """
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            return ChatResponse(
-                success=False,
-                error="Agent not initialized. Please check server configuration.",
-                response=""
-            )
-
         # Check database connection
-        if not current_agent.get_connection_status()['connected']:
+        if not agent.get_connection_status()['connected']:
             return ChatResponse(
                 success=False,
                 error="No database connection. Please connect to a database first.",
@@ -326,11 +249,11 @@ async def process_chat(request: ChatRequest):
         print(f"📝 Message: {request.message}")
 
         # Execute the query
-        result = current_agent.execute_natural_language_query(request.message)
+        result = agent.execute_natural_language_query(request.message)
 
-        # Convert DataFrame to list of dictionaries
+        # Convert DataFrame to list of dictionaries for JSON serialization
         data_list = None
-        if result['data'] is not None and not result['data'].empty:
+        if result['data'] is not None:
             data_list = result['data'].to_dict('records')
 
         # Prepare visualization data
@@ -338,40 +261,36 @@ async def process_chat(request: ChatRequest):
         if result['data'] is not None and not result['data'].empty:
             visualization_data = prepare_visualization_data(result['data'], request.message)
 
-        # Try to save to NextJS, but don't fail if it doesn't work
-        try:
-            chat_data = {
-                "userId": request.user_id,
-                "chatId": request.chat_id,
-                "message": request.message,
-                "response": result['response'],
-                "sqlQuery": result.get('sql_query'),
-                "data": data_list,
-                "visualizationData": visualization_data,
-                "success": result['success']
-            }
+        # Prepare data for NextJS
+        chat_data = {
+            "userId": request.user_id,
+            "chatId": request.chat_id,  # Can be None for new chat
+            "message": request.message,
+            "response": result['response'],
+            "sqlQuery": result.get('sql_query'),
+            "data": data_list,
+            "visualizationData": visualization_data,
+            "success": result['success']
+        }
 
-            if request.chat_id:
-                nextjs_response = await send_to_nextjs(f"chat/{request.chat_id}", chat_data, "POST")
-            else:
-                nextjs_response = await send_to_nextjs("chat", chat_data, "POST")
-                
-            return ChatResponse(
-                success=True,
-                message_id=nextjs_response.get('messageId'),
-                chat_id=nextjs_response.get('chatId'),
-                response=result['response']
-            )
-            
-        except HTTPException as e:
-            # If NextJS saving fails, still return the query result
-            print(f"⚠️ Failed to save to NextJS, but query succeeded: {e}")
-            return ChatResponse(
-                success=True,
-                response=result['response'],
-                error="Query succeeded but failed to save to database"
-            )
+        # Send to NextJS API to save
+        if request.chat_id:
+            # Add message to existing chat
+            nextjs_response = await send_to_nextjs(f"chat/{request.chat_id}", chat_data, "POST")
+        else:
+            # Create new chat
+            nextjs_response = await send_to_nextjs("chat", chat_data, "POST")
 
+        return ChatResponse(
+            success=True,
+            message_id=nextjs_response.get('messageId'),
+            chat_id=nextjs_response.get('chatId'),
+            response=result['response']
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (from NextJS API calls)
+        raise
     except Exception as e:
         error_msg = f"Chat processing failed: {str(e)}"
         print(f"❌ {error_msg}")
@@ -411,29 +330,23 @@ def prepare_visualization_data(df: pd.DataFrame, query: str) -> Dict[str, Any]:
     return chart_data
 
 @app.get("/suggestions")
-async def get_query_suggestions(partial_query: Optional[str] = ""):
-    """FIXED: Get query suggestions with error handling"""
+async def get_query_suggestions(partial_query: Optional[str] = "", agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Get query suggestions"""
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            return {"suggestions": []}
-        return {"suggestions": current_agent.get_query_suggestions(partial_query)}
+        return {"suggestions": agent.get_query_suggestions(partial_query)}
     except Exception as e:
-        return {"suggestions": [], "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/disconnect")
-async def disconnect_database():
-    """FIXED: Disconnect with improved error handling"""
+async def disconnect_database(agent: DatabaseAnalystAgent = Depends(get_agent)):
+    """Disconnect from database"""
     try:
-        current_agent = get_agent()
-        if current_agent is None:
-            return {"message": "Agent not initialized"}
-        current_agent.disconnect()
+        agent.disconnect()
         return {"message": "Disconnected successfully"}
     except Exception as e:
-        return {"message": f"Disconnect failed: {str(e)}"}
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Chat management endpoints
+# Additional endpoints for chat management
 @app.get("/user/{user_id}/chats")
 async def get_user_chats(user_id: str):
     """Get all chats for a user"""
@@ -441,7 +354,7 @@ async def get_user_chats(user_id: str):
         response = await send_to_nextjs(f"user/{user_id}/chats", {}, "GET")
         return response
     except Exception as e:
-        return {"chats": [], "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/chat/{chat_id}")
 async def get_chat(chat_id: str):
@@ -450,7 +363,7 @@ async def get_chat(chat_id: str):
         response = await send_to_nextjs(f"chat/{chat_id}", {}, "GET")
         return response
     except Exception as e:
-        return {"chat": None, "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/chat/{chat_id}")
 async def delete_chat(chat_id: str):
@@ -459,16 +372,15 @@ async def delete_chat(chat_id: str):
         response = await send_to_nextjs(f"chat/{chat_id}", {}, "DELETE")
         return response
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/test-nextjs-connection")
 async def test_nextjs_connection():
-    """Test NextJS API connectivity"""
+    """Test endpoint to verify NextJS API connectivity"""
     try:
         test_data = {
             "test": True,
-            "message": "Connection test from FastAPI",
-            "timestamp": pd.Timestamp.now().isoformat()
+            "message": "Connection test from FastAPI"
         }
         response = await send_to_nextjs("test", test_data, "POST")
         return {
@@ -482,16 +394,6 @@ async def test_nextjs_connection():
             "message": "NextJS connection failed",
             "error": str(e)
         }
-
-# FIXED: Added CORS testing endpoint
-@app.get("/test-cors")
-async def test_cors():
-    """Test CORS configuration"""
-    return {
-        "message": "CORS is working!",
-        "timestamp": pd.Timestamp.now().isoformat(),
-        "origin": "FastAPI Backend"
-    }
 
 if __name__ == "__main__":
     import uvicorn
