@@ -8,7 +8,7 @@ import UserModel from '@/models/User';
 import { Types } from 'mongoose';
 
 // In your route.ts file, change this line:
-const FASTAPI_BASE_URL = 'http://127.0.0.1:8000'; // Instead of localhost
+const FASTAPI_BASE_URL = 'https://vox-9xr7.onrender.com'; // Instead of localhost
 
 // Helper function to check FastAPI connection
 async function checkFastAPIConnection(): Promise<boolean> {
