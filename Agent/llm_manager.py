@@ -16,7 +16,7 @@ class LLMManager:
         try:
             # Initialize Gemini LLM
             Settings.llm = Gemini(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 api_key=gemini_api_key
             )
             
