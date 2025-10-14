@@ -1,0 +1,24 @@
+# Core web framework
+fastapi
+uvicorn[standard]
+
+# Environment variables
+python-dotenv
+
+# HTTP client
+httpx
+
+# Data science
+pandas
+sqlalchemy
+psycopg2-binary
+pymysql
+
+# Visualization
+plotly
+
+# AI & embeddings - Use core package for compatibility
+llama-index-core
+llama-index-llms-gemini
+llama-index-embeddings-gemini
+google-genai
