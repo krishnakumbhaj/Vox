@@ -40,7 +40,7 @@ interface ConnectionStatus {
   message: string;
 }
 
-const FASTAPI_BASE_URL = process.env.FASTAPI_URL || 'http://127.0.0.1:8000';
+const FASTAPI_BASE_URL = process.env.FASTAPI_URL || 'https://vox-9xr7.onrender.com';
 
 export default function ChatInterface() {
   const { data: session, status } = useSession();
