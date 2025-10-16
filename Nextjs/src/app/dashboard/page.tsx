@@ -1023,8 +1023,8 @@ export default function ChatInterface() {
 
         {/* Bottom Input Bar - Only show when there are messages */}
         {!isChatEmpty && (
-          <div className="pb-4 sm:pb-4 pt-1 bg-[#262624] backdrop-blur-sm animate-in slide-in-from-bottom duration-500 px-3 sm:px-0">
-            <div className="relative bg-[#30302e] rounded-2xl sm:rounded-3xl max-w-4xl mx-auto px-2 sm:px-4 lg:px-0 mb-safe">
+          <div className="pb-4 sm:pb-4 pt-1 bg-[#262624] px-3 sm:px-0">
+            <div className="relative bg-[#30302e] rounded-2xl sm:rounded-3xl max-w-4xl mx-auto px-2 sm:px-4 lg:px-0 mb-safe animate-slide-down">
               <PromptInputCustom
                 value={currentQuery}
                 onValueChange={setCurrentQuery}
@@ -1255,6 +1255,22 @@ export default function ChatInterface() {
         .scrollbar-hidden::-webkit-scrollbar {
           display: none; /* Chrome, Safari, Opera */
         }
+
+        /* Animation for input bar sliding from center to bottom */
+        @keyframes slideDown {
+          from {
+            transform: translateY(-50vh);
+            opacity: 0.9;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .animate-slide-down {
+          animation: slideDown 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
       `}</style>
     </div>
   );
@@ -1263,7 +1279,7 @@ export default function ChatInterface() {
 // Enhanced Message Component - Mobile Responsive
 const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session: { user?: { name?: string | null; email?: string | null; username?: string | null } } | null }> = ({ message, isMobile = false, session }) => {
   const [showSql, setShowSql] = useState(false);
-  const [showData, setShowData] = useState(false);
+  const [showData, setShowData] = useState(true); // Show data by default
 
   const isUserMessage = message.role === 'user';
   const isSystemMessage = message.content.includes('✅') || message.content.includes('❌') || message.content.includes('🗑️');
@@ -1302,18 +1318,8 @@ const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session
     );
   }
 
-  // Check if the response indicates an invalid or non-database question
-  const isInvalidQuery = message.content && (
-    message.content.toLowerCase().includes('not a valid') ||
-    message.content.toLowerCase().includes('invalid') ||
-    message.content.toLowerCase().includes('syntax error') ||
-    message.content.toLowerCase().includes('not a recognized') ||
-    message.content.toLowerCase().includes('cannot answer') ||
-    message.content.toLowerCase().includes('not related to')
-  );
-
-  // Check if there's SQL or data to show (but not if it's an invalid query)
-  const hasDataContent = !isInvalidQuery && (message.sqlQuery || (message.data && message.data.length > 0));
+  // Check if there's SQL or data to show - Always show if data property exists (even if empty array)
+  const hasDataContent = !!message.sqlQuery || (message.data !== undefined && message.data !== null);
   
   // Don't render anything if message has no content (still loading - processing indicator will show instead)
   if (!message.content && !hasDataContent) {
@@ -1392,7 +1398,7 @@ const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session
               )}
 
               {/* Data Table Section */}
-              {message.data && message.data.length > 0 && (
+              {message.data !== undefined && message.data !== null && (
                 <div className="mt-4 border-t border-[#ff4866] pt-4">
                   <button
                     onClick={() => setShowData(!showData)}
@@ -1405,45 +1411,51 @@ const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session
                   
                   {showData && (
                     <div className="bg-[#30302e] rounded-xl p-2 sm:p-4">
-                      <div className={`overflow-x-auto ${isMobile ? 'max-h-60' : 'max-h-80'} overflow-y-auto rounded-lg border border-gray-200`}>
-                        <div className="min-w-max">
-                          <table className="w-full text-sm bg-[#30302e]">
-                            <thead className="bg-[#30302e] sticky top-0">
-                              <tr>
-                                {Object.keys(message.data[0]).map((key) => (
-                                  <th key={key} className={`px-2 sm:px-4 py-1.5 sm:py-3 text-left border-b border-gray-200 font-semibold text-white whitespace-nowrap ${
-                                    isMobile ? 'text-xs' : 'text-sm'
-                                  }`}>
-                                    {key}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {message.data.slice(0, 100).map((row, index) => (
-                                <tr key={index} className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors">
-                                  {Object.values(row).map((value, colIndex) => (
-                                    <td key={colIndex} className={`px-2 sm:px-4 py-1.5 sm:py-3 text-white whitespace-nowrap ${
+                      {message.data.length > 0 ? (
+                        <div className={`overflow-x-auto ${isMobile ? 'max-h-60' : 'max-h-80'} overflow-y-auto rounded-lg border border-gray-200`}>
+                          <div className="min-w-max">
+                            <table className="w-full text-sm bg-[#30302e]">
+                              <thead className="bg-[#30302e] sticky top-0">
+                                <tr>
+                                  {Object.keys(message.data[0]).map((key) => (
+                                    <th key={key} className={`px-2 sm:px-4 py-1.5 sm:py-3 text-left border-b border-gray-200 font-semibold text-white whitespace-nowrap ${
                                       isMobile ? 'text-xs' : 'text-sm'
                                     }`}>
-                                      {value !== null ? String(value) : (
-                                        <span className="text-gray-400 italic">null</span>
-                                      )}
-                                    </td>
+                                      {key}
+                                    </th>
                                   ))}
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        {message.data.length > 100 && (
-                          <div className="p-3 bg-yellow-50 border-t border-yellow-200 text-center">
-                            <p className="text-xs text-yellow-700 font-medium">
-                              Showing first 100 rows of {message.data.length} total rows
-                            </p>
+                              </thead>
+                              <tbody>
+                                {message.data.slice(0, 100).map((row, index) => (
+                                  <tr key={index} className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors">
+                                    {Object.values(row).map((value, colIndex) => (
+                                      <td key={colIndex} className={`px-2 sm:px-4 py-1.5 sm:py-3 text-white whitespace-nowrap ${
+                                        isMobile ? 'text-xs' : 'text-sm'
+                                      }`}>
+                                        {value !== null ? String(value) : (
+                                          <span className="text-gray-400 italic">null</span>
+                                        )}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                        )}
-                      </div>
+                          {message.data.length > 100 && (
+                            <div className="p-3 bg-yellow-50 border-t border-yellow-200 text-center">
+                              <p className="text-xs text-yellow-700 font-medium">
+                                Showing first 100 rows of {message.data.length} total rows
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-400">
+                          <p className="text-sm">No data returned from this query</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
