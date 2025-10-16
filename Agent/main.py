@@ -29,8 +29,8 @@ app.add_middleware(
 
 # Configuration - Using environment variables
 import os
-FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")  # Your Render URL (this app)
-NEXTJS_API_URL = os.getenv("NEXTJS_API_URL", "http://localhost:3000/api")  # Your Vercel API URL
+FASTAPI_URL = os.getenv("FASTAPI_URL", "https://vox-9xr7.onrender.com")  # Your Render URL (this app)
+NEXTJS_API_URL = os.getenv("NEXTJS_API_URL", "https://vox-phi.vercel.app/api")  # Your Vercel API URL
 CHAT_SAVE_TIMEOUT = 10  # seconds
 
 # Global agent instance
