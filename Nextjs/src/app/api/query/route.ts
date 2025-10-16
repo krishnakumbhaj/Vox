@@ -221,6 +221,13 @@ export async function POST(request: NextRequest) {
           }
 
           // Save to MongoDB after streaming completes
+          console.log('💾 Saving to MongoDB:', {
+            hasData: !!collectedData,
+            dataLength: collectedData?.length,
+            dataType: Array.isArray(collectedData) ? 'array' : typeof collectedData,
+            sampleData: collectedData?.slice(0, 2)
+          });
+
           chat.messages.push({
             id: assistantMessageId,
             role: 'assistant',
@@ -231,13 +238,16 @@ export async function POST(request: NextRequest) {
             visualizationData: collectedVisualization || undefined
           });
 
+          // Mark messages as modified (critical for nested arrays in Mongoose)
+          chat.markModified('messages');
+
           // Update chat title if it's the first real conversation
           if (chat.messages.length === 2 && chat.title === 'New Database Query') {
             chat.title = query.substring(0, 50) + (query.length > 50 ? '...' : '');
           }
 
           await chat.save();
-          console.log('💾 Chat saved successfully');
+          console.log('💾 Chat saved successfully with', collectedData?.length || 0, 'data rows');
 
           // Send final metadata
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 

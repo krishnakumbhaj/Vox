@@ -46,6 +46,18 @@ export async function GET(_: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
 
+    // Log what we're retrieving from MongoDB
+    console.log('📥 Loading chat from MongoDB:', {
+      chatId: chat._id.toString(),
+      messageCount: chat.messages.length,
+      messagesWithData: chat.messages.filter(m => m.data).length,
+      sampleMessage: chat.messages.find(m => m.data) ? {
+        hasData: !!chat.messages.find(m => m.data)?.data,
+        dataLength: Array.isArray(chat.messages.find(m => m.data)?.data) ? (chat.messages.find(m => m.data)?.data as unknown[])?.length : undefined,
+        dataType: Array.isArray(chat.messages.find(m => m.data)?.data) ? 'array' : typeof chat.messages.find(m => m.data)?.data
+      } : 'no data messages'
+    });
+
     return NextResponse.json({
       success: true,
       chat: {

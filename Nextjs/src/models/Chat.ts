@@ -7,7 +7,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   sqlQuery?: string;
-  data?: unknown[];
+  data?: unknown[] | unknown; // Allow both array and any other type
   visualizationData?: unknown;
 }
 
@@ -27,8 +27,11 @@ const MessageSchema = new Schema<Message>({
   content: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
   sqlQuery: { type: String },
-  data: [{ type: Schema.Types.Mixed }],
+  data: { type: Schema.Types.Mixed }, // Changed from array to Mixed to accept any structure
   visualizationData: { type: Schema.Types.Mixed }
+}, { 
+  strict: false, // Allow additional fields not defined in schema
+  minimize: false // Ensure empty objects are saved
 });
 
 const ChatSchema = new Schema<Chat>({

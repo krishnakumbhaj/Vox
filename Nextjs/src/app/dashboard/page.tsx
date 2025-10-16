@@ -511,6 +511,11 @@ export default function ChatInterface() {
 
                 case 'data':
                   collectedData = event.content;
+                  console.log('📊 Data received from API:', {
+                    dataLength: collectedData?.length,
+                    hasVisualization: !!event.visualization,
+                    sampleData: collectedData?.slice(0, 2)
+                  });
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const index = newMessages.findIndex(msg => msg.id === serverMessageId);
@@ -520,6 +525,7 @@ export default function ChatInterface() {
                         data: collectedData!,
                         visualizationData: event.visualization
                       };
+                      console.log('✅ Message updated with data:', newMessages[index].data?.length, 'rows');
                     }
                     return newMessages;
                   });
@@ -1279,7 +1285,15 @@ export default function ChatInterface() {
 // Enhanced Message Component - Mobile Responsive
 const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session: { user?: { name?: string | null; email?: string | null; username?: string | null } } | null }> = ({ message, isMobile = false, session }) => {
   const [showSql, setShowSql] = useState(false);
-  const [showData, setShowData] = useState(true); // Show data by default
+  const [showData, setShowData] = useState(true); // ALWAYS show data by default - user can hide if needed
+
+  // Keep data visible when it arrives (for streaming messages)
+  useEffect(() => {
+    if (message.data !== undefined && message.data !== null && Array.isArray(message.data) && message.data.length > 0) {
+      setShowData(true); // Force show when data arrives
+      console.log('🔄 Data arrived, forcing showData to true:', message.data.length, 'rows');
+    }
+  }, [message.data]);
 
   const isUserMessage = message.role === 'user';
   const isSystemMessage = message.content.includes('✅') || message.content.includes('❌') || message.content.includes('🗑️');
@@ -1320,6 +1334,20 @@ const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session
 
   // Check if there's SQL or data to show - Always show if data property exists (even if empty array)
   const hasDataContent = !!message.sqlQuery || (message.data !== undefined && message.data !== null);
+  
+  // Debug logging - CRITICAL for production debugging
+  if (message.role === 'assistant' && hasDataContent) {
+    console.log('🎨 Rendering message:', {
+      id: message.id,
+      hasData: !!message.data,
+      dataIsArray: Array.isArray(message.data),
+      dataLength: Array.isArray(message.data) ? message.data.length : 'NOT AN ARRAY',
+      dataType: typeof message.data,
+      showData: showData,
+      hasSql: !!message.sqlQuery,
+      firstItem: Array.isArray(message.data) && message.data.length > 0 ? message.data[0] : null
+    });
+  }
   
   // Don't render anything if message has no content (still loading - processing indicator will show instead)
   if (!message.content && !hasDataContent) {
@@ -1405,13 +1433,13 @@ const MessageComponent: React.FC<{ message: Message; isMobile?: boolean; session
                     className="flex items-center gap-2 text-sm text-[#ff4866] font-medium transition-colors mb-3"
                   >
                     <BarChart3 className="w-4 h-4" />
-                    {showData ? 'Hide' : 'Show'} Data ({message.data.length} rows)
+                    {showData ? 'Hide' : 'Show'} Data ({Array.isArray(message.data) ? message.data.length : 0} rows)
                     <ChevronDown className={`w-4 h-4 transition-transform ${showData ? 'rotate-180' : ''}`} />
                   </button>
                   
                   {showData && (
                     <div className="bg-[#30302e] rounded-xl p-2 sm:p-4">
-                      {message.data.length > 0 ? (
+                      {Array.isArray(message.data) && message.data.length > 0 ? (
                         <div className={`overflow-x-auto ${isMobile ? 'max-h-60' : 'max-h-80'} overflow-y-auto rounded-lg border border-gray-200`}>
                           <div className="min-w-max">
                             <table className="w-full text-sm bg-[#30302e]">
