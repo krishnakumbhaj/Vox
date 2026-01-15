@@ -10,7 +10,7 @@ This repository contains an implementation of **NextAuth.js**, a powerful and fl
 - Fully customizable authentication flows.
 - Built-in protection for API routes.
 
----
+--
 
 ## 🛠️ Technologies Used
 - **Next.js**: React framework for server-rendered applications.
