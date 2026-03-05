@@ -12,15 +12,22 @@ class DatabaseAnalystAgent:
         self.query_processor = QueryProcessor(self.database_manager)
         # self.visualization_manager = VisualizationManager()
         
-        # Initialize LLM and embeddings
-        self._initialize_models()
+        self._models_initialized = False
     
-    def _initialize_models(self):
-        """Initialize LLM and embedding models"""
+    def _ensure_models_initialized(self):
+        """Lazily initialize LLM and embedding models when first needed"""
+        if self._models_initialized:
+            return
         try:
             LLMManager.initialize_models()
+            self._models_initialized = True
         except Exception as e:
             raise Exception(f"Failed to initialize models: {str(e)}")
+    
+    def _ensure_query_engine(self):
+        """Ensure both LLM models and query engine are ready"""
+        self._ensure_models_initialized()
+        self.database_manager.ensure_query_engine()
     
     def connect_from_env(self):
         """Connect to database using environment variables"""
@@ -43,6 +50,9 @@ class DatabaseAnalystAgent:
     
     def execute_natural_language_query(self, user_query):
         """Execute natural language query and return results with visualization"""
+        # Ensure LLM models and query engine are ready
+        self._ensure_query_engine()
+        
         # Validate query
         is_valid, message = self.query_processor.validate_query(user_query)
         if not is_valid:

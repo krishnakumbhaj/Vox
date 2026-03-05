@@ -40,7 +40,7 @@ interface ConnectionStatus {
   message: string;
 }
 
-const FASTAPI_BASE_URL = process.env.FASTAPI_URL || 'http://127.0.0.1:8000';
+const FASTAPI_BASE_URL = process.env.NEXT_PUBLIC_FASTAPI_URL;
 
 export default function ChatInterface() {
   const { data: session, status } = useSession();

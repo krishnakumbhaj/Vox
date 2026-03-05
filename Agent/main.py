@@ -13,25 +13,22 @@ from config import Config
 
 app = FastAPI(title="AI Database Analyst API", version="2.0.0")
 
+# Configuration - Using environment variables
+import os
+FASTAPI_URL = os.getenv("FASTAPI_URL")
+NEXTJS_API_URL = os.getenv("NEXTJS_API_URL")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",")
+CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS if origin.strip()]
+CHAT_SAVE_TIMEOUT = 10  # seconds
+
 # Add CORS middleware for NextJS frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://vox-phi.vercel.app",  # Remove trailing slash!
-        "https://*.vercel.app",  # Allow Vercel preview deployments
-        "http://localhost:3000",  # For local development
-        "http://127.0.0.1:3000"   # Alternative localhost
-    ],  
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configuration - Using environment variables
-import os
-FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")  # Your Render URL (this app)
-NEXTJS_API_URL = os.getenv("NEXTJS_API_URL", "http://localhost:3000/api")  # Your Vercel API URL
-CHAT_SAVE_TIMEOUT = 10  # seconds
 
 # Global agent instance
 agent = None
@@ -164,9 +161,20 @@ async def connect_database(connection: DatabaseConnection, agent: DatabaseAnalys
         raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
 
 @app.get("/connection-status", response_model=ConnectionStatus)
-async def get_connection_status(agent: DatabaseAnalystAgent = Depends(get_agent)):
+async def get_connection_status():
     """Get current database connection status"""
+    global agent
     try:
+        if agent is None:
+            try:
+                agent = DatabaseAnalystAgent()
+            except Exception:
+                return ConnectionStatus(
+                    connected=False,
+                    tables_count=0,
+                    tables=[],
+                    message="Not connected"
+                )
         status = agent.get_connection_status()
         return ConnectionStatus(
             connected=status['connected'],
@@ -175,7 +183,12 @@ async def get_connection_status(agent: DatabaseAnalystAgent = Depends(get_agent)
             message="Connected" if status['connected'] else "Not connected"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return ConnectionStatus(
+            connected=False,
+            tables_count=0,
+            tables=[],
+            message=str(e)
+        )
 
 @app.get("/tables")
 async def get_table_info(agent: DatabaseAnalystAgent = Depends(get_agent)):

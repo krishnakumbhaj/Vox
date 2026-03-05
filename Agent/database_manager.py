@@ -80,15 +80,6 @@ class DatabaseManager:
                     print(f"Could not get table info for '{table}': {e}")
             print("\n==========================\n")
             
-            # Create query engine with all tables explicitly specified
-            # Use verbose mode to see actual SQL generation
-            self.query_engine = NLSQLTableQueryEngine(
-                sql_database=self.sql_database,
-                tables=self.tables,
-                verbose=True,
-                synthesize_response=True
-            )
-            
             # Print schema info for debugging
             print("\n=== Database Schema Loaded ===")
             for table in self.tables:
@@ -149,6 +140,17 @@ class DatabaseManager:
         
         return table_info
     
+    def ensure_query_engine(self):
+        """Create query engine lazily (requires LLM Settings to be initialized first)"""
+        if self.query_engine is None and self.sql_database is not None:
+            self.query_engine = NLSQLTableQueryEngine(
+                sql_database=self.sql_database,
+                tables=self.tables,
+                verbose=True,
+                synthesize_response=True
+            )
+        return self.query_engine
+    
     def execute_raw_sql(self, sql_query):
         """Execute raw SQL query and return DataFrame"""
         try:
@@ -176,13 +178,8 @@ class DatabaseManager:
                 sample_rows_in_table_info=2
             )
             
-            # Recreate query engine
-            self.query_engine = NLSQLTableQueryEngine(
-                sql_database=self.sql_database,
-                tables=self.tables,
-                verbose=True,
-                synthesize_response=True
-            )
+            # Reset query engine so it gets recreated lazily on next query
+            self.query_engine = None
             
             print("\n=== Schema Refreshed ===")
             for table in self.tables:

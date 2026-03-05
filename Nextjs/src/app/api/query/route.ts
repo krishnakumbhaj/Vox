@@ -7,8 +7,7 @@ import ChatModel from '@/models/Chat';
 import UserModel from '@/models/User';
 import { Types } from 'mongoose';
 
-// Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows
-const FASTAPI_BASE_URL = 'http://127.0.0.1:8000';
+const FASTAPI_BASE_URL = process.env.FASTAPI_URL;
 
 // Helper function to check FastAPI connection
 async function checkFastAPIConnection(): Promise<boolean> {
