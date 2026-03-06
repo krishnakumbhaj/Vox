@@ -17,7 +17,7 @@ app = FastAPI(title="AI Database Analyst API", version="2.0.0")
 import os
 FASTAPI_URL = os.getenv("FASTAPI_URL")
 NEXTJS_API_URL = os.getenv("NEXTJS_API_URL")
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS if origin.strip()]
 CHAT_SAVE_TIMEOUT = 10  # seconds
 
